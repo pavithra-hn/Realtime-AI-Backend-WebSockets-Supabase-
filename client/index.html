@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime AI Backend</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --chat-bg: #1e293b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-secondary: #94a3b8;
+            --user-msg-bg: #3b82f6;
+            --ai-msg-bg: #334155;
+            --tool-msg-bg: #0f172a;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: var(--chat-bg);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Header */
+        header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ef4444;
+            /* Red for disconnected */
+            box-shadow: 0 0 10px #ef4444;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background-color: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Chat Area */
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 80%;
+            line-height: 1.6;
+            animation: fadeIn 0.3s ease;
+            white-space: pre-wrap;
+            /* Preserve formatting */
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            padding: 0.8rem 1.2rem;
+            border-radius: 1rem 1rem 0 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.ai {
+            align-self: flex-start;
+            background-color: var(--ai-msg-bg);
+            padding: 0.8rem 1.2rem;
+            border-radius: 1rem 1rem 1rem 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .tool-call {
+            align-self: center;
+            background-color: var(--tool-msg-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            margin: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tool-result {
+            display: none;
+            /* Usually hidden or subtle */
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1.5rem;
+            background-color: var(--chat-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .input-area input {
+            flex: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--chat-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 6px;
+            height: 16px;
+            background-color: var(--text-main);
+            margin-left: 2px;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Markdown Styles for AI Messages */
+        .message.ai strong {
+            font-weight: 700;
+            color: #60a5fa;
+        }
+
+        .message.ai em {
+            font-style: italic;
+            color: #a5b4fc;
+        }
+
+        .message.ai code {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9em;
+            color: #fbbf24;
+        }
+
+        .message.ai pre {
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+        }
+
+        .message.ai pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .message.ai h1,
+        .message.ai h2,
+        .message.ai h3 {
+            margin: 0.8rem 0 0.4rem 0;
+            color: #f8fafc;
+        }
+
+        .message.ai h1 {
+            font-size: 1.3rem;
+        }
+
+        .message.ai h2 {
+            font-size: 1.15rem;
+        }
+
+        .message.ai h3 {
+            font-size: 1.05rem;
+        }
+
+        .message.ai ul,
+        .message.ai ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .message.ai li {
+            margin: 0.25rem 0;
+        }
+
+        .message.ai p {
+            margin: 0.4rem 0;
+        }
+
+        .message.ai a {
+            color: #60a5fa;
+            text-decoration: underline;
+        }
+
+        .message.ai blockquote {
+            border-left: 3px solid #3b82f6;
+            padding-left: 1rem;
+            margin: 0.5rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .message.ai hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>
+                <div id="status-dot" class="status-dot"></div>
+                Realtime AI
+            </h1>
+            <div class="controls">
+                <input type="text" id="user-id" placeholder="User ID" value="user_123">
+                <button id="connect-btn" onclick="toggleConnection()">Connect</button>
+            </div>
+        </header>
+
+        <div id="chat-window">
+            <!-- Messages will appear here -->
+            <div class="message ai" style="display:none;" id="welcome-msg">
+                Hello! I'm your AI assistant. I can help you with simple implementation tasks or calculating shipping
+                costs.
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type a message..." disabled
+                onkeydown="handleEnter(event)">
+            <button id="send-btn" onclick="sendMessage()" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sessionId = null;
+        let currentAiMessageDiv = null;
+        let currentAiMessageRaw = ''; // Store raw text for markdown parsing
+
+        // Generate a random UUID-like string
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // Simple Markdown to HTML parser
+        function parseMarkdown(text) {
+            // Escape HTML first to prevent XSS
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Code blocks (must be done before other formatting)
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Headers (### before ## before #)
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Bold and Italic (order matters: bold first, then italic)
+            html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+            // Horizontal rule
+            html = html.replace(/^---$/gm, '<hr>');
+
+            // Blockquotes
+            html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+            // Unordered lists (- item)
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)\n(<li>)/g, '$1$2');
+            html = html.replace(/(<li>.*<\/li>)(?!\n<li>)/g, '<ul>$1</ul>');
+
+            // Links
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+            // Line breaks (preserve newlines as <br> for non-block elements)
+            html = html.replace(/\n/g, '<br>');
+
+            // Clean up extra <br> after block elements
+            html = html.replace(/<\/(h1|h2|h3|pre|ul|blockquote|hr)><br>/g, '</$1>');
+            html = html.replace(/<br><(h1|h2|h3|pre|ul|blockquote)/g, '<$1');
+
+            return html;
+        }
+
+        function toggleConnection() {
+            if (ws) {
+                ws.close();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            sessionId = generateUUID();
+            const userId = document.getElementById('user-id').value || 'anonymous';
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host; // e.g. localhost:8000
+            const url = `${protocol}//${host}/ws/session/${sessionId}?user_id=${userId}`;
+
+            console.log("Connecting to:", url);
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                console.log("Connected");
+                updateUIState(true);
+                addSystemMessage("Session started.");
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'content') {
+                        appendToCurrentAiMessage(data.value);
+                    } else if (data.type === 'tool_start') {
+                        // Show that a tool is being used
+                        addToolMessage(`Using tool: ${data.tool}...`);
+                    } else if (data.type === 'tool_end') {
+                        // Could update the tool message to show success, but we'll leave it as history
+                        console.log("Tool finished:", data.tool);
+                    }
+                } catch (e) {
+                    // Should not happen if backend is consistent, but fallback to raw text just in case
+                    console.warn("Received raw text or invalid JSON:", event.data);
+                    appendToCurrentAiMessage(event.data);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log("Disconnected");
+                ws = null;
+                updateUIState(false);
+                addSystemMessage("Session ended.");
+                currentAiMessageDiv = null;
+                currentAiMessageRaw = '';
+            };
+
+            ws.onerror = (err) => {
+                console.error("WebSocket error:", err);
+                // close will be called
+            };
+        }
+
+        function updateUIState(isConnected) {
+            const btn = document.getElementById('connect-btn');
+            const dot = document.getElementById('status-dot');
+            const input = document.getElementById('message-input');
+            const sendBtn = document.getElementById('send-btn');
+
+            if (isConnected) {
+                btn.innerText = "Disconnect";
+                btn.style.backgroundColor = "#ef4444"; // Red
+                dot.classList.add('connected');
+                input.disabled = false;
+                sendBtn.disabled = false;
+                input.focus();
+            } else {
+                btn.innerText = "Connect";
+                btn.style.backgroundColor = ""; // Default primary
+                dot.classList.remove('connected');
+                input.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text || !ws) return;
+
+            // Add User Message
+            addMessage(text, 'user');
+
+            // Send
+            ws.send(text);
+            input.value = '';
+
+            // Prepare for AI response
+            currentAiMessageDiv = null;
+            currentAiMessageRaw = '';
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        function addMessage(text, type) {
+            const chatWindow = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = text; // User messages stay as plain text
+            chatWindow.appendChild(div);
+            scrollToBottom();
+        }
+
+        function addSystemMessage(text) {
+            const chatWindow = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = `tool-call`; // Reuse style
+            div.textContent = text;
+            chatWindow.appendChild(div);
+            scrollToBottom();
+        }
+
+        function addToolMessage(text) {
+            const chatWindow = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = 'tool-call';
+            div.textContent = text;
+            chatWindow.appendChild(div);
+            scrollToBottom();
+
+            // Reset AI message div so next text starts in new bubble
+            currentAiMessageDiv = null;
+            currentAiMessageRaw = '';
+        }
+
+        function appendToCurrentAiMessage(text) {
+            const chatWindow = document.getElementById('chat-window');
+
+            if (!currentAiMessageDiv) {
+                currentAiMessageDiv = document.createElement('div');
+                currentAiMessageDiv.className = 'message ai';
+                chatWindow.appendChild(currentAiMessageDiv);
+                currentAiMessageRaw = '';
+            }
+
+            // Accumulate raw text and re-parse markdown each time
+            currentAiMessageRaw += text;
+            currentAiMessageDiv.innerHTML = parseMarkdown(currentAiMessageRaw);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+    </script>
+
+</body>
+
+</html>

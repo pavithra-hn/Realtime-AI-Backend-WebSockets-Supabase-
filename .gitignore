@@ -1,0 +1,32 @@
+# Environment variables (contains API keys - never commit!)
+.env
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+db_error_log.txt
+
+# Test/debug files
+check_db.py
+verify_supabase_connection.py
+Assignment.pdf
