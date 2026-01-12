@@ -207,14 +207,4 @@ Plain text message
 
 ---
 
-## 📝 License
 
-This project is for assessment/educational purposes.
-
----
-
-## 👤 Author
-
-**Pavithra H N**
-
----
